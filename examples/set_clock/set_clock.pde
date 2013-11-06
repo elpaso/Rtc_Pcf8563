@@ -33,6 +33,7 @@ void setup()
   rtc.setDate(14, 6, 3, 1, 10);
   //hr, min, sec
   rtc.setTime(1, 15, 0);
+  Serial.begin(9600);
 }
 
 void loop()
