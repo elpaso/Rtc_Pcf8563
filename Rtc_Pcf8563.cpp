@@ -16,7 +16,8 @@
  *    28/02/2012 A. Pasotti
  *             fixed a bug in RTCC_ALARM_AF,
  *             added a few (not really useful) methods
-
+ *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
+ *
  *  TODO
  *    x Add Euro date format
  *    Add short time (hh:mm) format
@@ -39,59 +40,57 @@ Rtc_Pcf8563::Rtc_Pcf8563(void)
 
 void Rtc_Pcf8563::initClock()
 {
-  Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
-  Wire.write((byte)0x0);        // start address
+    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
+    Wire.write((byte)0x0);        // start address
 
-  Wire.write((byte)0x0);     //control/status1
-  Wire.write((byte)0x0);     //control/status2
-  Wire.write((byte)0x01);     //set seconds
-  Wire.write((byte)0x01);    //set minutes
-  Wire.write((byte)0x01);    //set hour
-  Wire.write((byte)0x01);    //set day
-  Wire.write((byte)0x01);    //set weekday
-  Wire.write((byte)0x01);     //set month, century to 1
-  Wire.write((byte)0x01);    //set year to 99
-  Wire.write((byte)0x80);    //minute alarm value reset to 00
-  Wire.write((byte)0x80);    //hour alarm value reset to 00
-  Wire.write((byte)0x80);    //day alarm value reset to 00
-  Wire.write((byte)0x80);    //weekday alarm value reset to 00
-  Wire.write((byte)0x0);     //set SQW, see: setSquareWave
-  Wire.write((byte)0x0);     //timer off
-  Wire.endTransmission();
-
+    Wire.write((byte)0x0);     //control/status1
+    Wire.write((byte)0x0);     //control/status2
+    Wire.write((byte)0x81);     //set seconds & VL
+    Wire.write((byte)0x01);    //set minutes
+    Wire.write((byte)0x01);    //set hour
+    Wire.write((byte)0x01);    //set day
+    Wire.write((byte)0x01);    //set weekday
+    Wire.write((byte)0x01);     //set month, century to 1
+    Wire.write((byte)0x01);    //set year to 99
+    Wire.write((byte)0x80);    //minute alarm value reset to 00
+    Wire.write((byte)0x80);    //hour alarm value reset to 00
+    Wire.write((byte)0x80);    //day alarm value reset to 00
+    Wire.write((byte)0x80);    //weekday alarm value reset to 00
+    Wire.write((byte)0x0);     //set SQW, see: setSquareWave
+    Wire.write((byte)0x0);     //timer off
+    Wire.endTransmission();
 }
 
 /* Private internal functions, but useful to look at if you need a similar func. */
 byte Rtc_Pcf8563::decToBcd(byte val)
 {
-  return ( (val/10*16) + (val%10) );
+    return ( (val/10*16) + (val%10) );
 }
 
 byte Rtc_Pcf8563::bcdToDec(byte val)
 {
-  return ( (val/16*10) + (val%16) );
+    return ( (val/16*10) + (val%16) );
 }
 
 
 void Rtc_Pcf8563::clearStatus()
 {
-  Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
-  Wire.write((byte)0x0);
-  Wire.write((byte)0x0);                 //control/status1
-  Wire.write((byte)0x0);                 //control/status2
-  Wire.endTransmission();
+    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
+    Wire.write((byte)0x0);
+    Wire.write((byte)0x0);                 //control/status1
+    Wire.write((byte)0x0);                 //control/status2
+    Wire.endTransmission();
 }
 
 void Rtc_Pcf8563::setTime(byte hour, byte minute, byte sec)
 {
-  Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
-  Wire.write((byte)RTCC_SEC_ADDR);       // send addr low byte, req'd
+    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
+    Wire.write((byte)RTCC_SEC_ADDR);       // send addr low byte, req'd
 
-  Wire.write((byte)decToBcd(sec));         //set seconds
-  Wire.write((byte)decToBcd(minute));    //set minutes
-  Wire.write((byte)decToBcd(hour));        //set hour
-  Wire.endTransmission();
-
+    Wire.write((byte)decToBcd(sec));         //set seconds
+    Wire.write((byte)decToBcd(minute));    //set minutes
+    Wire.write((byte)decToBcd(hour));        //set hour
+    Wire.endTransmission();
 }
 
 void Rtc_Pcf8563::setDate(byte day, byte weekday, byte mon, byte century, byte year)
@@ -213,7 +212,7 @@ void Rtc_Pcf8563::setAlarm(byte min, byte hour, byte day, byte weekday)
     Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
     Wire.write((byte)RTCC_ALRM_MIN_ADDR);
     Wire.write((byte)min);                //minute alarm value reset to 00
-    Wire.write((byte)hour);                //hour alarm value reset to 00
+    Wire.write((byte)hour);               //hour alarm value reset to 00
     Wire.write((byte)day);                //day alarm value reset to 00
     Wire.write((byte)weekday);            //weekday alarm value reset to 00
     Wire.endTransmission();
@@ -322,7 +321,6 @@ void Rtc_Pcf8563::getDate()
     //0x1f = 0b00011111
     month = month & 0x1f;
     month = bcdToDec(month);
-year = bcdToDec(Wire.read());
 }
 
 void Rtc_Pcf8563::getTime()
