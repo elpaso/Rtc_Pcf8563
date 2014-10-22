@@ -19,6 +19,7 @@
  *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
  *    22/10/2014 add voltLow get/set, cevich
  *    22/10/2014 add century get, cevich
+ *    22/10/2014 Fix get/set date/time race condition, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -62,6 +63,8 @@
 #define RTCC_YEAR_ADDR      0x08
 #define RTCC_ALRM_MIN_ADDR  0x09
 #define RTCC_SQW_ADDR       0x0D
+#define RTCC_TIMER1_ADDR    0x0E
+#define RTCC_TIMER2_ADDR    0x0F
 
 /* setting the alarm flag to 0 enables the alarm.
  * set it to 1 to disable the alarm for that value.
@@ -100,6 +103,9 @@ class Rtc_Pcf8563 {
     void clearStatus(); /* set both status bytes to zero */
     void clearVoltLow(void); /* Only clearing is possible */
 
+    void getDateTime();     /* get date and time vals to local vars */
+    void setDateTime(byte day, byte weekday, byte month, bool century, byte year,
+                     byte hour, byte minute, byte sec);
     void getDate();   /* get date vals to local vars */
     void setDate(byte day, byte weekday, byte month, bool century, byte year);
     void getTime();    /* get time vars + 2 status bytes to local vars */
