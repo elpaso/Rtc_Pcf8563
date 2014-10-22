@@ -17,6 +17,7 @@
  *             fixed a bug in RTCC_ALARM_AF,
  *             added a few (not really useful) methods
  *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
+ *    22/10/2014 add voltLow get/set, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -113,6 +114,7 @@ class Rtc_Pcf8563 {
     void setSquareWave(byte frequency);
     void clearSquareWave();
 
+    bool getVoltLow();
     byte getSecond();
     byte getMinute();
     byte getHour();
@@ -140,6 +142,7 @@ class Rtc_Pcf8563 {
     /* time variables */
     byte hour;
     byte minute;
+    bool volt_low;
     byte sec;
     byte day;
     byte weekday;

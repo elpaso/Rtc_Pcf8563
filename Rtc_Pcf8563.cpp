@@ -17,6 +17,7 @@
  *             fixed a bug in RTCC_ALARM_AF,
  *             added a few (not really useful) methods
  *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
+ *    22/10/2014 add voltLow get/set, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -334,7 +335,9 @@ void Rtc_Pcf8563::getTime()
     status1 = Wire.read();
     status2 = Wire.read();
     //0x7f = 0b01111111
-    sec = bcdToDec(Wire.read() & 0x7f);
+    volt_low = Wire.read();
+    sec = bcdToDec(volt_low & 0x7f);
+    volt_low = volt_low & 0x80;  // VL_Seconds
     minute = bcdToDec(Wire.read() & 0x7f);
     //0x3f = 0b00111111
     hour = bcdToDec(Wire.read() & 0x3f);
@@ -441,6 +444,12 @@ char *Rtc_Pcf8563::formatDate(byte style)
     }
     return strDate;
 }
+
+bool Rtc_Pcf8563::getVoltLow(void)
+{
+    return volt_low;
+}
+
 
 byte Rtc_Pcf8563::getSecond() {
     return sec;
