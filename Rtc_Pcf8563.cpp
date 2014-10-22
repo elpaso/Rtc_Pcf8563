@@ -18,6 +18,7 @@
  *             added a few (not really useful) methods
  *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
  *    22/10/2014 add voltLow get/set, cevich
+ *    22/10/2014 add century get, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -100,15 +101,15 @@ void Rtc_Pcf8563::setTime(byte hour, byte minute, byte sec)
     Wire.endTransmission();
 }
 
-void Rtc_Pcf8563::setDate(byte day, byte weekday, byte mon, byte century, byte year)
+void Rtc_Pcf8563::setDate(byte day, byte weekday, byte mon, bool century, byte year)
 {
     /* year val is 00 to 99, xx
         with the highest bit of month = century
         0=20xx
         1=19xx
         */
-    month = decToBcd(mon);
-    if (century == 1){
+    month = decToBcd(month);
+    if (century){
         month |= RTCC_CENTURY_MASK;
     }
     else {
@@ -320,10 +321,10 @@ void Rtc_Pcf8563::getDate()
     //get raw month data byte and set month and century with it.
     month = Wire.read();
     if (month & RTCC_CENTURY_MASK) {
-        century = 1;
+        century = true;
     }
     else {
-        century = 0;
+        century = false;
     }
     //0x1f = 0b00011111
     month = month & 0x1f;
@@ -386,7 +387,7 @@ char *Rtc_Pcf8563::formatDate(byte style)
 
         case RTCC_DATE_ASIA:
             //do the asian style, yyyy-mm-dd
-            if ( century == 1 ){
+            if (century ){
                 strDate[0] = '1';
                 strDate[1] = '9';
             }
@@ -412,7 +413,7 @@ char *Rtc_Pcf8563::formatDate(byte style)
             strDate[3] = '0' + (day / 10);
             strDate[4] = '0' + (day % 10);
             strDate[5] = '/';
-            if ( century == 1 ){
+            if (century){
                 strDate[6] = '1';
                 strDate[7] = '9';
             }
@@ -434,7 +435,7 @@ char *Rtc_Pcf8563::formatDate(byte style)
             strDate[4] = '0' + (month % 10);
             strDate[5] = '-';
 
-            if ( century == 1 ){
+            if (century){
                 strDate[6] = '1';
                 strDate[7] = '9';
             }
@@ -495,6 +496,10 @@ byte Rtc_Pcf8563::getMonth() {
 
 byte Rtc_Pcf8563::getYear() {
     return year;
+}
+
+bool Rtc_Pcf8563::getCentury() {
+    return century;
 }
 
 byte Rtc_Pcf8563::getWeekday() {

@@ -30,6 +30,7 @@ getDay          KEYWORD2
 getWeekDay      KEYWORD2
 getMonth        KEYWORD2
 getYear         KEYWORD2
+getCentury      KEYWORD2
 formatTime      KEYWORD2
 formatDate      KEYWORD2
 

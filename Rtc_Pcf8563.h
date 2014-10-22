@@ -18,6 +18,7 @@
  *             added a few (not really useful) methods
  *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
  *    22/10/2014 add voltLow get/set, cevich
+ *    22/10/2014 add century get, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -100,7 +101,7 @@ class Rtc_Pcf8563 {
     void clearVoltLow(void); /* Only clearing is possible */
 
     void getDate();   /* get date vals to local vars */
-    void setDate(byte day, byte weekday, byte month, byte century, byte year);
+    void setDate(byte day, byte weekday, byte month, bool century, byte year);
     void getTime();    /* get time vars + 2 status bytes to local vars */
     void setTime(byte hour, byte minute, byte sec);  /* Also clear Volt-Low */
     void getAlarm();
@@ -123,6 +124,7 @@ class Rtc_Pcf8563 {
     byte getDay();
     byte getMonth();
     byte getYear();
+    bool getCentury();
     byte getWeekday();
     byte getStatus1();
     byte getStatus2();
@@ -155,10 +157,15 @@ class Rtc_Pcf8563 {
     byte alarm_minute;
     byte alarm_weekday;
     byte alarm_day;
+    /* CLKOUT */
+    byte squareWave;
+    /* timer */
+    byte timer_control;
+    byte timer_current;
     /* support */
     byte status1;
     byte status2;
-    byte century;
+    bool century;
 
     char strOut[9];
     char strDate[11];
