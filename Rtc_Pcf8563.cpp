@@ -24,12 +24,12 @@
  *               extern Wire, cevich
  *    26/11/2014 Add zeroClock(), initialize to lowest possible
  *               values, cevich
+ *    22/10/2014 add timer support, cevich
  *
  *  TODO
  *    x Add Euro date format
  *    Add short time (hh:mm) format
  *    Add 24h/12h format
- *    Add timer support
  ******
  *  Robodoc embedded documentation.
  *  http://www.xs4all.nl/~rfsber/Robo/robodoc.html
@@ -173,6 +173,10 @@ void Rtc_Pcf8563::getDateTime(void)
 
     // CLKOUT_control 0x03 = 0b00000011
     squareWave = readBuffer[13] & 0x03;
+
+    // timer bytes
+    timer_control = readBuffer[14] & 0x03;
+    timer_value = readBuffer[15];  // current value != set value when running
 }
 
 
@@ -332,6 +336,105 @@ void Rtc_Pcf8563::resetAlarm()
     status2 &= ~RTCC_ALARM_AF;
     //set TF to 1 masks it from changing, as per data-sheet
     status2 |= RTCC_TIMER_TF;
+
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_STAT2_ADDR);
+    Wire.write((byte)status2);
+    Wire.endTransmission();
+}
+
+// true if timer interrupt and control is enabled
+bool Rtc_Pcf8563::timerEnabled()
+{
+    if (getStatus2() & RTCC_TIMER_TIE)
+        if (timer_control & RTCC_TIMER_TE)
+            return true;
+    return false;
+}
+
+
+// true if timer is active
+bool Rtc_Pcf8563::timerActive()
+{
+    return getStatus2() & RTCC_TIMER_TF;
+}
+
+
+// enable timer and interrupt
+void Rtc_Pcf8563::enableTimer(void)
+{
+    if (timerEnabled())  // also updates timer_control
+        return; // already enabled
+    //set TE to 1
+    timer_control |= RTCC_TIMER_TE;
+    //set status2 TF val to zero
+    status2 &= ~RTCC_TIMER_TF;
+    //set AF to 1 masks it from changing, as per data-sheet
+    status2 |= RTCC_ALARM_AF;
+    //enable the interrupt
+    status2 |= RTCC_TIMER_TIE;
+
+    // Enable interrupt first, then enable timer
+    Wire.beginTransmission(Rtcc_Addr);  // Issue I2C start signal
+    Wire.write((byte)RTCC_STAT2_ADDR);
+    Wire.write((byte)status2);
+    Wire.endTransmission();
+
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_TIMER1_ADDR);
+    Wire.write((byte)timer_control);
+    Wire.endTransmission();
+}
+
+
+// set count-down value and frequency
+void Rtc_Pcf8563::setTimer(byte value, byte frequency)
+{
+    timer_value = value;
+    timer_control |= (frequency & RTCC_TIMER_TD10); // use only last 2 bits
+
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_TIMER1_ADDR);
+    Wire.write((byte)timer_control);
+    Wire.write((byte)timer_value);
+    Wire.endTransmission();
+
+    enableTimer();
+}
+
+
+// clear timer flag and interrupt
+void Rtc_Pcf8563::clearTimer(void)
+{
+    //set status2 TF val to zero
+    status2 &= ~RTCC_TIMER_TF;
+    //set AF to 1 masks it from changing, as per data-sheet
+    status2 |= RTCC_ALARM_AF;
+    //turn off the interrupt
+    status2 &= ~RTCC_TIMER_TIE;
+    //turn off the timer
+    timer_control &= ~RTCC_TIMER_TE;
+
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_STAT2_ADDR);
+    Wire.write((byte)status2);
+    Wire.endTransmission();
+
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_TIMER1_ADDR);
+    Wire.write((byte)timer_control);
+    Wire.endTransmission();
+}
+
+
+// clear timer flag but leave interrupt unchanged */
+void Rtc_Pcf8563::resetTimer(void)
+{
+    //set status2 TF val to zero to reset timer
+    status2 &= ~RTCC_TIMER_TF;
+    //set AF to 1 masks it from changing, as per data-sheet
+    status2 |= RTCC_ALARM_AF;
+
     Wire.beginTransmission(Rtcc_Addr);
     Wire.write((byte)RTCC_STAT2_ADDR);
     Wire.write((byte)status2);

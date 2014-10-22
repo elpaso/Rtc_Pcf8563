@@ -24,12 +24,12 @@
  *               extern Wire, cevich
  *    26/11/2014 Add zeroClock(), initialize to lowest possible
  *               values, cevich
+ *    22/10/2014 add timer support, cevich
  *
  *  TODO
  *    x Add Euro date format
  *    Add short time (hh:mm) format
  *    Add 24h/12h format
- *    Add timer support
  ******
  *  Robodoc embedded documentation.
  *  http://www.xs4all.nl/~rfsber/Robo/robodoc.html
@@ -77,7 +77,24 @@
 #define RTCC_NO_ALARM       99
 
 #define RTCC_TIMER_TIE      0x01  // Timer Interrupt Enable
+
 #define RTCC_TIMER_TF       0x04  // Timer Flag, read/write active state
+                                  // When clearing, be sure to set RTCC_TIMER_AF
+                                  // to 1 (see note above).
+#define RTCC_TIMER_TI_TP    0x10  // 0: INT is active when TF is active
+                                  //    (subject to the status of TIE)
+                                  // 1: INT pulses active
+                                  //    (subject to the status of TIE);
+                                  // Note: TF stays active until cleared
+                                  // no matter what RTCC_TIMER_TI_TP is.
+#define RTCC_TIMER_TD10     0x03  // Timer source clock, TMR_1MIN saves power
+#define RTCC_TIMER_TE       0x80  // Timer 1:enable/0:disable
+
+/* Timer source-clock frequency constants */
+#define TMR_4096HZ      B00000000
+#define TMR_64Hz        B00000001
+#define TMR_1Hz         B00000010
+#define TMR_1MIN        B00000011
 
 #define RTCC_CENTURY_MASK   0x80
 #define RTCC_VLSEC_MASK     0x80
@@ -123,6 +140,13 @@ class Rtc_Pcf8563 {
     void setAlarm(byte min, byte hour, byte day, byte weekday);
     void clearAlarm(); /* clear alarm flag and interrupt */
     void resetAlarm();  /* clear alarm flag but leave interrupt unchanged */
+
+    bool timerEnabled();  // true if timer and interrupt is enabled
+    bool timerActive();   // true if timer is active (going off)
+    void enableTimer(void); // activate timer flag and interrupt
+    void setTimer(byte value, byte frequency);  // set count-down value & frequency
+    void clearTimer(void); // clear timer flag and interrupt
+    void resetTimer(void); // clear timer flag but leave interrupt unchanged */
 
     void setSquareWave(byte frequency);
     void clearSquareWave();
@@ -178,6 +202,9 @@ class Rtc_Pcf8563 {
     byte alarm_day;
     /* CLKOUT */
     byte squareWave;
+    /* timer */
+    byte timer_control;
+    byte timer_value;
     /* support */
     byte status1;
     byte status2;
