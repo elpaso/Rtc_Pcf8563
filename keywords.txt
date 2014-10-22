@@ -37,3 +37,15 @@ formatDate      KEYWORD2
 #######################################
 # Constants (LITERAL1)
 #######################################
+
+RTCC_DATE_WORLD LITERAL1
+RTCC_DATE_ASIA  LITERAL1
+RTCC_DATE_US    LITERAL1
+RTCC_TIME_HMS   LITERAL1
+RTCC_TIME_HM    LITERAL1
+
+SQW_DISABLE     LITERAL1
+SQW_32KHZ       LITERAL1
+SQW_1024HZ      LITERAL1
+SQW_32HZ        LITERAL1
+SQW_1HZ         LITERAL1
