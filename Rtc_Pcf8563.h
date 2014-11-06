@@ -99,7 +99,7 @@ class Rtc_Pcf8563 {
     void getDate();   /* get date vals to local vars */
     void setDate(byte day, byte weekday, byte month, byte century, byte year);
     void getTime();    /* get time vars + 2 status bytes to local vars */
-    void setTime(byte hour, byte minute, byte sec, bool volt_low=0);
+    void setTime(byte hour, byte minute, byte sec);
     void getAlarm();
     byte readStatus2();
     boolean alarmEnabled();
