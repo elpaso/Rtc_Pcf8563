@@ -22,6 +22,8 @@
  *    22/10/2014 Fix get/set date/time race condition, cevich
  *    22/10/2014 Header/Code rearranging, alarm/timer flag masking
  *               extern Wire, cevich
+ *    26/11/2014 Add zeroClock(), initialize to lowest possible
+ *               values, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -42,29 +44,6 @@ Rtc_Pcf8563::Rtc_Pcf8563(void)
     Rtcc_Addr = RTCC_R>>1;
 }
 
-void Rtc_Pcf8563::initClock()
-{
-    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
-    Wire.write((byte)0x0);        // start address
-
-    Wire.write((byte)0x0);     //control/status1
-    Wire.write((byte)0x0);     //control/status2
-    Wire.write((byte)0x01);    //set seconds & clear VL
-    Wire.write((byte)0x01);    //set minutes
-    Wire.write((byte)0x01);    //set hour
-    Wire.write((byte)0x01);    //set day
-    Wire.write((byte)0x01);    //set weekday
-    Wire.write((byte)0x01);    //set month, century to 1
-    Wire.write((byte)0x01);    //set year to 99
-    Wire.write((byte)0x80);    //minute alarm value reset to 00
-    Wire.write((byte)0x80);    //hour alarm value reset to 00
-    Wire.write((byte)0x80);    //day alarm value reset to 00
-    Wire.write((byte)0x80);    //weekday alarm value reset to 00
-    Wire.write((byte)0x0);     //set SQW, see: setSquareWave
-    Wire.write((byte)0x0);     //timer off
-    Wire.endTransmission();
-}
-
 /* Private internal functions, but useful to look at if you need a similar func. */
 byte Rtc_Pcf8563::decToBcd(byte val)
 {
@@ -74,6 +53,29 @@ byte Rtc_Pcf8563::decToBcd(byte val)
 byte Rtc_Pcf8563::bcdToDec(byte val)
 {
     return ( (val/16*10) + (val%16) );
+}
+
+void Rtc_Pcf8563::zeroClock()
+{
+    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
+    Wire.write((byte)0x0);        // start address
+
+    Wire.write((byte)0x0);     //control/status1
+    Wire.write((byte)0x0);     //control/status2
+    Wire.write((byte)0x00);    //set seconds to 0 & VL to 0
+    Wire.write((byte)0x00);    //set minutes to 0
+    Wire.write((byte)0x00);    //set hour to 0
+    Wire.write((byte)0x01);    //set day to 1
+    Wire.write((byte)0x00);    //set weekday to 0
+    Wire.write((byte)0x81);    //set month to 1, century to 1900
+    Wire.write((byte)0x00);    //set year to 0
+    Wire.write((byte)0x80);    //minute alarm value reset to 00
+    Wire.write((byte)0x80);    //hour alarm value reset to 00
+    Wire.write((byte)0x80);    //day alarm value reset to 00
+    Wire.write((byte)0x80);    //weekday alarm value reset to 00
+    Wire.write((byte)SQW_32KHZ); //set SQW to default, see: setSquareWave
+    Wire.write((byte)0x0);     //timer off
+    Wire.endTransmission();
 }
 
 void Rtc_Pcf8563::clearStatus()
@@ -454,11 +456,34 @@ const char *Rtc_Pcf8563::formatDate(byte style)
     return strDate;
 }
 
+void Rtc_Pcf8563::initClock()
+{
+    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
+    Wire.write((byte)0x0);        // start address
+
+    Wire.write((byte)0x0);     //control/status1
+    Wire.write((byte)0x0);     //control/status2
+    Wire.write((byte)0x81);     //set seconds & VL
+    Wire.write((byte)0x01);    //set minutes
+    Wire.write((byte)0x01);    //set hour
+    Wire.write((byte)0x01);    //set day
+    Wire.write((byte)0x01);    //set weekday
+    Wire.write((byte)0x01);     //set month, century to 1
+    Wire.write((byte)0x01);    //set year to 99
+    Wire.write((byte)0x80);    //minute alarm value reset to 00
+    Wire.write((byte)0x80);    //hour alarm value reset to 00
+    Wire.write((byte)0x80);    //day alarm value reset to 00
+    Wire.write((byte)0x80);    //weekday alarm value reset to 00
+    Wire.write((byte)0x0);     //set SQW, see: setSquareWave
+    Wire.write((byte)0x0);     //timer off
+    Wire.endTransmission();
+}
+
 void Rtc_Pcf8563::setTime(byte hour, byte minute, byte sec)
 {
     getDateTime();
-    setDateTime(getDay(), getWeekday(), getMonth(), getCentury(), getYear(),
-                hour, minute, sec);
+    setDateTime(getDay(), getWeekday(), getMonth(),
+                getCentury(), getYear(), hour, minute, sec);
 }
 
 void Rtc_Pcf8563::setDate(byte day, byte weekday, byte month, bool century, byte year)

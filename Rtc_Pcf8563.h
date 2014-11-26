@@ -22,6 +22,8 @@
  *    22/10/2014 Fix get/set date/time race condition, cevich
  *    22/10/2014 Header/Code rearranging, alarm/timer flag masking,
  *               extern Wire, cevich
+ *    26/11/2014 Add zeroClock(), initialize to lowest possible
+ *               values, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -105,7 +107,7 @@ class Rtc_Pcf8563 {
     public:
     Rtc_Pcf8563();
 
-    void initClock();  /* zero out all values, disable all alarms */
+    void zeroClock();  /* Zero date/time, alarm / timer, default clkout */
     void clearStatus(); /* set both status bytes to zero */
     byte readStatus2();
     void clearVoltLow(void); /* Only clearing is possible */
@@ -147,6 +149,9 @@ class Rtc_Pcf8563 {
     byte getAlarmDay();
     byte getAlarmWeekday();
 
+    // Sets date/time to static fixed values, disable all alarms
+    // use zeroClock() above to guarantee lowest possible values instead.
+    void initClock();
     // Slightly unsafe, don't use for new code, use above instead!
     void setTime(byte hour, byte minute, byte sec);
     void getTime();  // unsafe, don't use
