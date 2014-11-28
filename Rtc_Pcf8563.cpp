@@ -363,8 +363,7 @@ bool Rtc_Pcf8563::timerActive()
 // enable timer and interrupt
 void Rtc_Pcf8563::enableTimer(void)
 {
-    if (timerEnabled())  // also updates timer_control
-        return; // already enabled
+    getDateTime();
     //set TE to 1
     timer_control |= RTCC_TIMER_TE;
     //set status2 TF val to zero
@@ -382,21 +381,32 @@ void Rtc_Pcf8563::enableTimer(void)
 
     Wire.beginTransmission(Rtcc_Addr);
     Wire.write((byte)RTCC_TIMER1_ADDR);
-    Wire.write((byte)timer_control);
+    Wire.write((byte)timer_control);  // Timer starts ticking now!
     Wire.endTransmission();
 }
 
 
 // set count-down value and frequency
-void Rtc_Pcf8563::setTimer(byte value, byte frequency)
+void Rtc_Pcf8563::setTimer(byte value, byte frequency, bool is_pulsed)
 {
+    getDateTime();
+    if (is_pulsed)
+        status2 |= is_pulsed << 4;
+    else
+        status2 &= ~(is_pulsed << 4);
     timer_value = value;
+    // TE set to 1 in enableTimer(), leave 0 for now
     timer_control |= (frequency & RTCC_TIMER_TD10); // use only last 2 bits
 
     Wire.beginTransmission(Rtcc_Addr);
     Wire.write((byte)RTCC_TIMER1_ADDR);
     Wire.write((byte)timer_control);
     Wire.write((byte)timer_value);
+    Wire.endTransmission();
+
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_STAT2_ADDR);
+    Wire.write((byte)status2);
     Wire.endTransmission();
 
     enableTimer();
@@ -406,6 +416,7 @@ void Rtc_Pcf8563::setTimer(byte value, byte frequency)
 // clear timer flag and interrupt
 void Rtc_Pcf8563::clearTimer(void)
 {
+    getDateTime();
     //set status2 TF val to zero
     status2 &= ~RTCC_TIMER_TF;
     //set AF to 1 masks it from changing, as per data-sheet
@@ -413,16 +424,18 @@ void Rtc_Pcf8563::clearTimer(void)
     //turn off the interrupt
     status2 &= ~RTCC_TIMER_TIE;
     //turn off the timer
-    timer_control &= ~RTCC_TIMER_TE;
+    timer_control = 0;
 
-    Wire.beginTransmission(Rtcc_Addr);
-    Wire.write((byte)RTCC_STAT2_ADDR);
-    Wire.write((byte)status2);
-    Wire.endTransmission();
-
+    // Stop timer first
     Wire.beginTransmission(Rtcc_Addr);
     Wire.write((byte)RTCC_TIMER1_ADDR);
     Wire.write((byte)timer_control);
+    Wire.endTransmission();
+
+    // clear flag and interrupt
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_STAT2_ADDR);
+    Wire.write((byte)status2);
     Wire.endTransmission();
 }
 
@@ -430,6 +443,7 @@ void Rtc_Pcf8563::clearTimer(void)
 // clear timer flag but leave interrupt unchanged */
 void Rtc_Pcf8563::resetTimer(void)
 {
+    getDateTime();
     //set status2 TF val to zero to reset timer
     status2 &= ~RTCC_TIMER_TF;
     //set AF to 1 masks it from changing, as per data-sheet
@@ -637,6 +651,22 @@ byte Rtc_Pcf8563::getAlarmDay() {
 
 byte Rtc_Pcf8563::getAlarmWeekday() {
     return alarm_weekday;
+}
+
+byte Rtc_Pcf8563::getTimerControl() {
+    return timer_control;
+}
+
+byte Rtc_Pcf8563::getTimerValue() {
+    // Impossible to freeze this value, it could
+    // be changing during read.  Multiple reads
+    // required to check for consistency.
+    uint8_t last_value;
+    do {
+        last_value = timer_value;
+        getDateTime();
+    } while (timer_value != last_value);
+    return timer_value;
 }
 
 byte Rtc_Pcf8563::getDay() {

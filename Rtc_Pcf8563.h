@@ -144,9 +144,9 @@ class Rtc_Pcf8563 {
     bool timerEnabled();  // true if timer and interrupt is enabled
     bool timerActive();   // true if timer is active (going off)
     void enableTimer(void); // activate timer flag and interrupt
-    void setTimer(byte value, byte frequency);  // set count-down value & frequency
-    void clearTimer(void); // clear timer flag and interrupt
-    void resetTimer(void); // clear timer flag but leave interrupt unchanged */
+    void setTimer(byte value, byte frequency, bool is_pulsed);  // set value & frequency
+    void clearTimer(void); // clear timer flag, and interrupt, leave value unchanged
+    void resetTimer(void); // same as clearTimer() but leave interrupt unchanged */
 
     void setSquareWave(byte frequency);
     void clearSquareWave();
@@ -172,6 +172,9 @@ class Rtc_Pcf8563 {
     byte getAlarmHour();
     byte getAlarmDay();
     byte getAlarmWeekday();
+
+    byte getTimerControl();
+    byte getTimerValue();
 
     // Sets date/time to static fixed values, disable all alarms
     // use zeroClock() above to guarantee lowest possible values instead.

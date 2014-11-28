@@ -10,6 +10,7 @@ Rtc_Pcf8563     KEYWORD1
 # Methods and Functions (KEYWORD2)
 #######################################
 
+zeroClock       KEYWORD2
 initClock       KEYWORD2
 clearStatus     KEYWORD2
 getDateTime     KEYWORD2
@@ -39,6 +40,9 @@ enableTImer     KEYWORD2
 setTimer        KEYWORD2
 clearTimer      KEYWORD2
 resetTimer      KEYWORD2
+getTimerControl KEYWORD2
+getTimerValue   KEYWORD2
+
 
 #######################################
 # Constants (LITERAL1)
