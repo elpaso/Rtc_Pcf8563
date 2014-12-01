@@ -72,6 +72,7 @@
 #define RTCC_NO_ALARM   99
 
 #define RTCC_CENTURY_MASK   0x80
+#define RTCC_VLSEC_MASK     0x80
 
 /* date format flags */
 #define RTCC_DATE_WORLD     0x01
@@ -96,11 +97,12 @@ class Rtc_Pcf8563 {
 
     void initClock();  /* zero out all values, disable all alarms */
     void clearStatus(); /* set both status bytes to zero */
+    void clearVoltLow(void); /* Only clearing is possible */
 
     void getDate();   /* get date vals to local vars */
     void setDate(byte day, byte weekday, byte month, byte century, byte year);
     void getTime();    /* get time vars + 2 status bytes to local vars */
-    void setTime(byte hour, byte minute, byte sec);
+    void setTime(byte hour, byte minute, byte sec);  /* Also clear Volt-Low */
     void getAlarm();
     byte readStatus2();
     boolean alarmEnabled();
