@@ -17,6 +17,7 @@
  *             fixed a bug in RTCC_ALARM_AF,
  *             added a few (not really useful) methods
  *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
+ *    22/10/2014 add voltLow get/set, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -72,6 +73,12 @@ byte Rtc_Pcf8563::bcdToDec(byte val)
     return ( (val/16*10) + (val%16) );
 }
 
+void Rtc_Pcf8563::clearVoltLow(void)
+{
+    getTime();
+    // Only clearing is possible on device (I tried)
+    setTime(getHour(), getMinute(), getSecond());
+}
 
 void Rtc_Pcf8563::clearStatus()
 {
@@ -87,7 +94,7 @@ void Rtc_Pcf8563::setTime(byte hour, byte minute, byte sec)
     Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
     Wire.write((byte)RTCC_SEC_ADDR);       // send addr low byte, req'd
 
-    Wire.write((byte)decToBcd(sec));         //set seconds
+    Wire.write(decToBcd(sec) & ~RTCC_VLSEC_MASK); //set seconds
     Wire.write((byte)decToBcd(minute));    //set minutes
     Wire.write((byte)decToBcd(hour));        //set hour
     Wire.endTransmission();
@@ -334,7 +341,9 @@ void Rtc_Pcf8563::getTime()
     status1 = Wire.read();
     status2 = Wire.read();
     //0x7f = 0b01111111
-    sec = bcdToDec(Wire.read() & 0x7f);
+    volt_low = Wire.read();
+    sec = bcdToDec(volt_low & ~RTCC_VLSEC_MASK);
+    volt_low = volt_low & RTCC_VLSEC_MASK;  // VL_Seconds
     minute = bcdToDec(Wire.read() & 0x7f);
     //0x3f = 0b00111111
     hour = bcdToDec(Wire.read() & 0x3f);
@@ -441,6 +450,12 @@ char *Rtc_Pcf8563::formatDate(byte style)
     }
     return strDate;
 }
+
+bool Rtc_Pcf8563::getVoltLow(void)
+{
+    return volt_low;
+}
+
 
 byte Rtc_Pcf8563::getSecond() {
     return sec;

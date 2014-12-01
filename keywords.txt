@@ -22,6 +22,7 @@ setAlarm        KEYWORD2
 clearAlarm      KEYWORD2
 getStatus1      KEYWORD2
 getStatus2      KEYWORD2
+getVoltLow      KEYWORD2
 getSecond       KEYWORD2
 getMinute       KEYWORD2
 getHour         KEYWORD2
