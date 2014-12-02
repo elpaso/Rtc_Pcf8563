@@ -39,25 +39,6 @@
 #include "Rtc_Pcf8563.h"
 
 
-/* Private internal functions, but useful to look at if you need a similar func. */
-byte Rtc_Pcf8563::decToBcd(byte val)
-{
-    return ( (val/10*16) + (val%10) );
-}
-
-
-byte Rtc_Pcf8563::bcdToDec(byte val)
-{
-    return ( (val/16*10) + (val%16) );
-}
-
-
-Rtc_Pcf8563::Rtc_Pcf8563(void)  // CONSTRUCTOR
-{
-    Wire.begin();
-}
-
-
 void Rtc_Pcf8563::zeroClock()
 {
     Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
@@ -81,6 +62,7 @@ void Rtc_Pcf8563::zeroClock()
     Wire.endTransmission();
 }
 
+
 void Rtc_Pcf8563::clearStatus()
 {
     Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
@@ -90,14 +72,6 @@ void Rtc_Pcf8563::clearStatus()
     Wire.endTransmission();
 }
 
-/*
-* Read status byte
-*/
-byte Rtc_Pcf8563::readStatus2()
-{
-    getDateTime();
-    return getStatus2();
-}
 
 void Rtc_Pcf8563::clearVoltLow(void)
 {
@@ -108,9 +82,7 @@ void Rtc_Pcf8563::clearVoltLow(void)
                 getMinute(), getSecond());
 }
 
-/*
-* Atomicly read all device registers in one operation
-*/
+
 void Rtc_Pcf8563::getDateTime(void)
 {
     /* Start at beginning, read entire memory in one go */
@@ -213,36 +185,7 @@ void Rtc_Pcf8563::setDateTime(byte day, byte weekday, byte month,
     getDateTime();
 }
 
-/**
-* Get alarm, set values to RTCC_NO_ALARM (99) if alarm flag is not set
-*/
-void Rtc_Pcf8563::getAlarm()
-{
-    getDateTime();
-}
 
-/*
-* Returns true if AIE is on
-*
-*/
-bool Rtc_Pcf8563::alarmEnabled()
-{
-    return getStatus2() & RTCC_ALARM_AIE;
-}
-
-/*
-* Returns true if AF is on
-*
-*/
-bool Rtc_Pcf8563::alarmActive()
-{
-    return getStatus2() & RTCC_ALARM_AF;
-}
-
-/* enable alarm interrupt
- * whenever the clock matches these values an int will
- * be sent out pin 3 of the Pcf8563 chip
- */
 void Rtc_Pcf8563::enableAlarm()
 {
     getDateTime();  // operate on current values
@@ -260,10 +203,7 @@ void Rtc_Pcf8563::enableAlarm()
     Wire.endTransmission();
 }
 
-/* set the alarm values
- * whenever the clock matches these values an int will
- * be sent out pin 3 of the Pcf8563 chip
- */
+
 void Rtc_Pcf8563::setAlarm(byte min, byte hour, byte day, byte weekday)
 {
     getDateTime();  // operate on current values
@@ -315,6 +255,7 @@ void Rtc_Pcf8563::setAlarm(byte min, byte hour, byte day, byte weekday)
     Rtc_Pcf8563::enableAlarm();
 }
 
+
 void Rtc_Pcf8563::clearAlarm()
 {
     //set status2 AF val to zero to reset alarm
@@ -330,9 +271,7 @@ void Rtc_Pcf8563::clearAlarm()
     Wire.endTransmission();
 }
 
-/**
-* Reset the alarm leaving interrupt unchanged
-*/
+
 void Rtc_Pcf8563::resetAlarm()
 {
     //set status2 AF val to zero to reset alarm
@@ -346,24 +285,7 @@ void Rtc_Pcf8563::resetAlarm()
     Wire.endTransmission();
 }
 
-// true if timer interrupt and control is enabled
-bool Rtc_Pcf8563::timerEnabled()
-{
-    if (getStatus2() & RTCC_TIMER_TIE)
-        if (timer_control & RTCC_TIMER_TE)
-            return true;
-    return false;
-}
 
-
-// true if timer is active
-bool Rtc_Pcf8563::timerActive()
-{
-    return getStatus2() & RTCC_TIMER_TF;
-}
-
-
-// enable timer and interrupt
 void Rtc_Pcf8563::enableTimer(void)
 {
     getDateTime();
@@ -389,7 +311,6 @@ void Rtc_Pcf8563::enableTimer(void)
 }
 
 
-// set count-down value and frequency
 void Rtc_Pcf8563::setTimer(byte value, byte frequency, bool is_pulsed)
 {
     getDateTime();
@@ -416,7 +337,6 @@ void Rtc_Pcf8563::setTimer(byte value, byte frequency, bool is_pulsed)
 }
 
 
-// clear timer flag and interrupt
 void Rtc_Pcf8563::clearTimer(void)
 {
     getDateTime();
@@ -443,7 +363,6 @@ void Rtc_Pcf8563::clearTimer(void)
 }
 
 
-// clear timer flag but leave interrupt unchanged */
 void Rtc_Pcf8563::resetTimer(void)
 {
     getDateTime();
@@ -458,9 +377,7 @@ void Rtc_Pcf8563::resetTimer(void)
     Wire.endTransmission();
 }
 
-/**
-* Set the square wave pin output
-*/
+
 void Rtc_Pcf8563::setSquareWave(byte frequency)
 {
     Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
@@ -469,10 +386,6 @@ void Rtc_Pcf8563::setSquareWave(byte frequency)
     Wire.endTransmission();
 }
 
-void Rtc_Pcf8563::clearSquareWave()
-{
-    Rtc_Pcf8563::setSquareWave(SQW_DISABLE);
-}
 
 const char *Rtc_Pcf8563::formatTime(byte style)
 {
@@ -597,105 +510,4 @@ void Rtc_Pcf8563::initClock()
     Wire.write((byte)0x0);     //set SQW, see: setSquareWave
     Wire.write((byte)0x0);     //timer off
     Wire.endTransmission();
-}
-
-void Rtc_Pcf8563::setTime(byte hour, byte minute, byte sec)
-{
-    getDateTime();
-    setDateTime(getDay(), getWeekday(), getMonth(),
-                getCentury(), getYear(), hour, minute, sec);
-}
-
-void Rtc_Pcf8563::setDate(byte day, byte weekday, byte month, bool century, byte year)
-{
-    getDateTime();
-    setDateTime(day, weekday, month, century, year,
-                getHour(), getMinute(), getSecond());
-}
-
-void Rtc_Pcf8563::getDate()
-{
-    getDateTime();
-}
-
-void Rtc_Pcf8563::getTime()
-{
-    getDateTime();
-}
-
-bool Rtc_Pcf8563::getVoltLow(void)
-{
-    return volt_low;
-}
-
-byte Rtc_Pcf8563::getSecond() {
-    return sec;
-}
-
-byte Rtc_Pcf8563::getMinute() {
-    return minute;
-}
-
-byte Rtc_Pcf8563::getHour() {
-    return hour;
-}
-
-byte Rtc_Pcf8563::getAlarmMinute() {
-    return alarm_minute;
-}
-
-byte Rtc_Pcf8563::getAlarmHour() {
-    return alarm_hour;
-}
-
-byte Rtc_Pcf8563::getAlarmDay() {
-    return alarm_day;
-}
-
-byte Rtc_Pcf8563::getAlarmWeekday() {
-    return alarm_weekday;
-}
-
-byte Rtc_Pcf8563::getTimerControl() {
-    return timer_control;
-}
-
-byte Rtc_Pcf8563::getTimerValue() {
-    // Impossible to freeze this value, it could
-    // be changing during read.  Multiple reads
-    // required to check for consistency.
-    uint8_t last_value;
-    do {
-        last_value = timer_value;
-        getDateTime();
-    } while (timer_value != last_value);
-    return timer_value;
-}
-
-byte Rtc_Pcf8563::getDay() {
-    return day;
-}
-
-byte Rtc_Pcf8563::getMonth() {
-    return month;
-}
-
-byte Rtc_Pcf8563::getYear() {
-    return year;
-}
-
-bool Rtc_Pcf8563::getCentury() {
-    return century;
-}
-
-byte Rtc_Pcf8563::getWeekday() {
-    return weekday;
-}
-
-byte Rtc_Pcf8563::getStatus1() {
-    return status1;
-}
-
-byte Rtc_Pcf8563::getStatus2() {
-    return status2;
 }
