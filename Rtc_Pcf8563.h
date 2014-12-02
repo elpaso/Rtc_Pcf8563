@@ -18,6 +18,12 @@
  *             added a few (not really useful) methods
  *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
  *    22/10/2014 add voltLow get/set, cevich
+ *    22/10/2014 add century get, cevich
+ *    22/10/2014 Fix get/set date/time race condition, cevich
+ *    22/10/2014 Header/Code rearranging, alarm/timer flag masking,
+ *               extern Wire, cevich
+ *    26/11/2014 Add zeroClock(), initialize to lowest possible
+ *               values, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -31,9 +37,6 @@
 
 #ifndef Rtc_Pcf8563_H
 #define Rtc_Pcf8563_H
-
-#include "Arduino.h"
-#include "Wire.h"
 
 /* the read and write values for pcf8563 rtcc */
 /* these are adjusted for arduino */
@@ -61,15 +64,20 @@
 #define RTCC_YEAR_ADDR      0x08
 #define RTCC_ALRM_MIN_ADDR  0x09
 #define RTCC_SQW_ADDR       0x0D
+#define RTCC_TIMER1_ADDR    0x0E
+#define RTCC_TIMER2_ADDR    0x0F
 
 /* setting the alarm flag to 0 enables the alarm.
  * set it to 1 to disable the alarm for that value.
  */
-#define RTCC_ALARM      0x80
-#define RTCC_ALARM_AIE  0x02
-#define RTCC_ALARM_AF   0x08 // 0x08 : not 0x04!!!!
+#define RTCC_ALARM          0x80
+#define RTCC_ALARM_AIE      0x02
+#define RTCC_ALARM_AF       0x08
 /* optional val for no alarm setting */
-#define RTCC_NO_ALARM   99
+#define RTCC_NO_ALARM       99
+
+#define RTCC_TIMER_TIE      0x01  // Timer Interrupt Enable
+#define RTCC_TIMER_TF       0x04  // Timer Flag, read/write active state
 
 #define RTCC_CENTURY_MASK   0x80
 #define RTCC_VLSEC_MASK     0x80
@@ -89,32 +97,40 @@
 #define SQW_32HZ        B10000010
 #define SQW_1HZ         B10000011
 
+#include <Arduino.h>
+#include <Wire.h>
+
+extern TwoWire Wire;
 
 /* arduino class */
 class Rtc_Pcf8563 {
     public:
     Rtc_Pcf8563();
 
-    void initClock();  /* zero out all values, disable all alarms */
+    void zeroClock();  /* Zero date/time, alarm / timer, default clkout */
     void clearStatus(); /* set both status bytes to zero */
+    byte readStatus2();
     void clearVoltLow(void); /* Only clearing is possible */
 
-    void getDate();   /* get date vals to local vars */
-    void setDate(byte day, byte weekday, byte month, byte century, byte year);
-    void getTime();    /* get time vars + 2 status bytes to local vars */
-    void setTime(byte hour, byte minute, byte sec);  /* Also clear Volt-Low */
-    void getAlarm();
-    byte readStatus2();
-    boolean alarmEnabled();
-    boolean alarmActive();
-
+    void getDateTime();     /* get date and time vals to local vars */
+    void setDateTime(byte day, byte weekday, byte month, bool century, byte year,
+                     byte hour, byte minute, byte sec);
+    void getAlarm();  // same as getDateTime
+    bool alarmEnabled();  // true if alarm interrupt is enabled
+    bool alarmActive();   // true if alarm is active (going off)
     void enableAlarm(); /* activate alarm flag and interrupt */
     /* set alarm vals, 99=ignore */
     void setAlarm(byte min, byte hour, byte day, byte weekday);
     void clearAlarm(); /* clear alarm flag and interrupt */
     void resetAlarm();  /* clear alarm flag but leave interrupt unchanged */
+
     void setSquareWave(byte frequency);
     void clearSquareWave();
+
+    /*get a output string, these call getTime/getDate for latest vals */
+    const char *formatTime(byte style=RTCC_TIME_HMS);
+    /* date supports 3 styles as listed in the wikipedia page about world date/time. */
+    const char *formatDate(byte style=RTCC_DATE_US);
 
     bool getVoltLow();
     byte getSecond();
@@ -123,6 +139,7 @@ class Rtc_Pcf8563 {
     byte getDay();
     byte getMonth();
     byte getYear();
+    bool getCentury();
     byte getWeekday();
     byte getStatus1();
     byte getStatus2();
@@ -132,10 +149,14 @@ class Rtc_Pcf8563 {
     byte getAlarmDay();
     byte getAlarmWeekday();
 
-    /*get a output string, these call getTime/getDate for latest vals */
-    char *formatTime(byte style=RTCC_TIME_HMS);
-    /* date supports 3 styles as listed in the wikipedia page about world date/time. */
-    char *formatDate(byte style=RTCC_DATE_US);
+    // Sets date/time to static fixed values, disable all alarms
+    // use zeroClock() above to guarantee lowest possible values instead.
+    void initClock();
+    // Slightly unsafe, don't use for new code, use above instead!
+    void setTime(byte hour, byte minute, byte sec);
+    void getTime();  // unsafe, don't use
+    void setDate(byte day, byte weekday, byte month, bool century, byte year);
+    void getDate();  // unsafe, don't use
 
     private:
     /* methods */
@@ -155,10 +176,12 @@ class Rtc_Pcf8563 {
     byte alarm_minute;
     byte alarm_weekday;
     byte alarm_day;
+    /* CLKOUT */
+    byte squareWave;
     /* support */
     byte status1;
     byte status2;
-    byte century;
+    bool century;
 
     char strOut[9];
     char strDate[11];

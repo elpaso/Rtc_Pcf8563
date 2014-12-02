@@ -18,6 +18,12 @@
  *             added a few (not really useful) methods
  *    22/10/2014 Fix whitespace, tabs, and newlines, cevich
  *    22/10/2014 add voltLow get/set, cevich
+ *    22/10/2014 add century get, cevich
+ *    22/10/2014 Fix get/set date/time race condition, cevich
+ *    22/10/2014 Header/Code rearranging, alarm/timer flag masking
+ *               extern Wire, cevich
+ *    26/11/2014 Add zeroClock(), initialize to lowest possible
+ *               values, cevich
  *
  *  TODO
  *    x Add Euro date format
@@ -29,37 +35,13 @@
  *  http://www.xs4all.nl/~rfsber/Robo/robodoc.html
  */
 
-#include "Arduino.h"
-#include "Wire.h"
+#include <Arduino.h>
 #include "Rtc_Pcf8563.h"
 
 Rtc_Pcf8563::Rtc_Pcf8563(void)
 {
     Wire.begin();
     Rtcc_Addr = RTCC_R>>1;
-}
-
-void Rtc_Pcf8563::initClock()
-{
-    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
-    Wire.write((byte)0x0);        // start address
-
-    Wire.write((byte)0x0);     //control/status1
-    Wire.write((byte)0x0);     //control/status2
-    Wire.write((byte)0x81);     //set seconds & VL
-    Wire.write((byte)0x01);    //set minutes
-    Wire.write((byte)0x01);    //set hour
-    Wire.write((byte)0x01);    //set day
-    Wire.write((byte)0x01);    //set weekday
-    Wire.write((byte)0x01);     //set month, century to 1
-    Wire.write((byte)0x01);    //set year to 99
-    Wire.write((byte)0x80);    //minute alarm value reset to 00
-    Wire.write((byte)0x80);    //hour alarm value reset to 00
-    Wire.write((byte)0x80);    //day alarm value reset to 00
-    Wire.write((byte)0x80);    //weekday alarm value reset to 00
-    Wire.write((byte)0x0);     //set SQW, see: setSquareWave
-    Wire.write((byte)0x0);     //timer off
-    Wire.endTransmission();
 }
 
 /* Private internal functions, but useful to look at if you need a similar func. */
@@ -73,11 +55,27 @@ byte Rtc_Pcf8563::bcdToDec(byte val)
     return ( (val/16*10) + (val%16) );
 }
 
-void Rtc_Pcf8563::clearVoltLow(void)
+void Rtc_Pcf8563::zeroClock()
 {
-    getTime();
-    // Only clearing is possible on device (I tried)
-    setTime(getHour(), getMinute(), getSecond());
+    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
+    Wire.write((byte)0x0);        // start address
+
+    Wire.write((byte)0x0);     //control/status1
+    Wire.write((byte)0x0);     //control/status2
+    Wire.write((byte)0x00);    //set seconds to 0 & VL to 0
+    Wire.write((byte)0x00);    //set minutes to 0
+    Wire.write((byte)0x00);    //set hour to 0
+    Wire.write((byte)0x01);    //set day to 1
+    Wire.write((byte)0x00);    //set weekday to 0
+    Wire.write((byte)0x81);    //set month to 1, century to 1900
+    Wire.write((byte)0x00);    //set year to 0
+    Wire.write((byte)0x80);    //minute alarm value reset to 00
+    Wire.write((byte)0x80);    //hour alarm value reset to 00
+    Wire.write((byte)0x80);    //day alarm value reset to 00
+    Wire.write((byte)0x80);    //weekday alarm value reset to 00
+    Wire.write((byte)SQW_32KHZ); //set SQW to default, see: setSquareWave
+    Wire.write((byte)0x0);     //timer off
+    Wire.endTransmission();
 }
 
 void Rtc_Pcf8563::clearStatus()
@@ -89,38 +87,149 @@ void Rtc_Pcf8563::clearStatus()
     Wire.endTransmission();
 }
 
-void Rtc_Pcf8563::setTime(byte hour, byte minute, byte sec)
+/*
+* Read status byte
+*/
+byte Rtc_Pcf8563::readStatus2()
 {
-    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
-    Wire.write((byte)RTCC_SEC_ADDR);       // send addr low byte, req'd
-
-    Wire.write(decToBcd(sec) & ~RTCC_VLSEC_MASK); //set seconds
-    Wire.write((byte)decToBcd(minute));    //set minutes
-    Wire.write((byte)decToBcd(hour));        //set hour
-    Wire.endTransmission();
+    getDateTime();
+    return getStatus2();
 }
 
-void Rtc_Pcf8563::setDate(byte day, byte weekday, byte mon, byte century, byte year)
+void Rtc_Pcf8563::clearVoltLow(void)
+{
+    getDateTime();
+    // Only clearing is possible on device (I tried)
+    setDateTime(getDay(), getWeekday(), getMonth(),
+                getCentury(), getYear(), getHour(),
+                getMinute(), getSecond());
+}
+
+/*
+* Atomicly read all device registers in one operation
+*/
+void Rtc_Pcf8563::getDateTime(void)
+{
+    /* Start at beginning, read entire memory in one go */
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_STAT1_ADDR);
+    Wire.endTransmission();
+
+    /* As per data sheet, have to read everything all in one operation */
+    uint8_t readBuffer[16] = {0};
+    Wire.requestFrom(Rtcc_Addr, 16);
+    for (uint8_t i=0; i < 16; i++)
+        readBuffer[i] = Wire.read();
+
+    // status bytes
+    status1 = readBuffer[0];
+    status2 = readBuffer[1];
+
+    // time bytes
+    //0x7f = 0b01111111
+    volt_low = readBuffer[2] & RTCC_VLSEC_MASK;  //VL_Seconds
+    sec = bcdToDec(readBuffer[2] & ~RTCC_VLSEC_MASK);
+    minute = bcdToDec(readBuffer[3] & 0x7f);
+    //0x3f = 0b00111111
+    hour = bcdToDec(readBuffer[4] & 0x3f);
+
+    // date bytes
+    //0x3f = 0b00111111
+    day = bcdToDec(readBuffer[5] & 0x3f);
+    //0x07 = 0b00000111
+    weekday = bcdToDec(readBuffer[6] & 0x07);
+    //get raw month data byte and set month and century with it.
+    month = readBuffer[7];
+    if (month & RTCC_CENTURY_MASK)
+        century = true;
+    else
+        century = false;
+    //0x1f = 0b00011111
+    month = month & 0x1f;
+    month = bcdToDec(month);
+    year = bcdToDec(readBuffer[8]);
+
+    // alarm bytes
+    alarm_minute = readBuffer[9];
+    if(B10000000 & alarm_minute)
+        alarm_minute = RTCC_NO_ALARM;
+    else
+        alarm_minute = bcdToDec(alarm_minute & B01111111);
+    alarm_hour = readBuffer[10];
+    if(B10000000 & alarm_hour)
+        alarm_hour = RTCC_NO_ALARM;
+    else
+        alarm_hour = bcdToDec(alarm_hour & B00111111);
+    alarm_day = readBuffer[11];
+    if(B10000000 & alarm_day)
+        alarm_day = RTCC_NO_ALARM;
+    else
+        alarm_day = bcdToDec(alarm_day  & B00111111);
+    alarm_weekday = readBuffer[12];
+    if(B10000000 & alarm_weekday)
+        alarm_weekday = RTCC_NO_ALARM;
+    else
+        alarm_weekday = bcdToDec(alarm_weekday  & B00000111);
+
+    // CLKOUT_control 0x03 = 0b00000011
+    squareWave = readBuffer[13] & 0x03;
+}
+
+
+void Rtc_Pcf8563::setDateTime(byte day, byte weekday, byte month,
+                              bool century, byte year, byte hour,
+                              byte minute, byte sec)
 {
     /* year val is 00 to 99, xx
         with the highest bit of month = century
         0=20xx
         1=19xx
         */
-    month = decToBcd(mon);
-    if (century == 1){
+    month = decToBcd(month);
+    if (century)
         month |= RTCC_CENTURY_MASK;
-    }
-    else {
+    else
         month &= ~RTCC_CENTURY_MASK;
-    }
+
+    /* As per data sheet, have to set everything all in one operation */
     Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
-    Wire.write((byte)RTCC_DAY_ADDR);
-    Wire.write((byte)decToBcd(day));            //set day
-    Wire.write((byte)decToBcd(weekday));    //set weekday
-    Wire.write((byte)month);                         //set month, century to 1
-    Wire.write((byte)decToBcd(year));        //set year to 99
+    Wire.write(RTCC_SEC_ADDR);       // send addr low byte, req'd
+    Wire.write(decToBcd(sec) &~RTCC_VLSEC_MASK); //set sec, clear VL bit
+    Wire.write(decToBcd(minute));    //set minutes
+    Wire.write(decToBcd(hour));        //set hour
+    Wire.write(decToBcd(day));            //set day
+    Wire.write(decToBcd(weekday));    //set weekday
+    Wire.write(month);                 //set month, century to 1
+    Wire.write(decToBcd(year));        //set year to 99
     Wire.endTransmission();
+    // Keep values in-sync with device
+    getDateTime();
+}
+
+/**
+* Get alarm, set values to RTCC_NO_ALARM (99) if alarm flag is not set
+*/
+void Rtc_Pcf8563::getAlarm()
+{
+    getDateTime();
+}
+
+/*
+* Returns true if AIE is on
+*
+*/
+bool Rtc_Pcf8563::alarmEnabled()
+{
+    return getStatus2() & RTCC_ALARM_AIE;
+}
+
+/*
+* Returns true if AF is on
+*
+*/
+bool Rtc_Pcf8563::alarmActive()
+{
+    return getStatus2() & RTCC_ALARM_AF;
 }
 
 /* enable alarm interrupt
@@ -129,9 +238,11 @@ void Rtc_Pcf8563::setDate(byte day, byte weekday, byte mon, byte century, byte y
  */
 void Rtc_Pcf8563::enableAlarm()
 {
-
+    getDateTime();  // operate on current values
     //set status2 AF val to zero
     status2 &= ~RTCC_ALARM_AF;
+    //set TF to 1 masks it from changing, as per data-sheet
+    status2 |= RTCC_TIMER_TF;
     //enable the interrupt
     status2 |= RTCC_ALARM_AIE;
 
@@ -142,46 +253,13 @@ void Rtc_Pcf8563::enableAlarm()
     Wire.endTransmission();
 }
 
-
-/*
-* Read status byte
-*/
-byte Rtc_Pcf8563::readStatus2()
-{
-    /* set the start byte of the status 2 data */
-    Wire.beginTransmission(Rtcc_Addr);
-    Wire.write((byte)RTCC_STAT2_ADDR);
-    Wire.endTransmission();
-
-    Wire.requestFrom(Rtcc_Addr, 1); //request 1 bytes
-    return Wire.read();
-}
-
-/*
-* Returns true if AIE is on
-*
-*/
-boolean Rtc_Pcf8563::alarmEnabled()
-{
-    return Rtc_Pcf8563::readStatus2() & RTCC_ALARM_AIE;
-}
-
-/*
-* Returns true if AF is on
-*
-*/
-boolean Rtc_Pcf8563::alarmActive()
-{
-    return Rtc_Pcf8563::readStatus2() & RTCC_ALARM_AF;
-}
-
-
 /* set the alarm values
  * whenever the clock matches these values an int will
  * be sent out pin 3 of the Pcf8563 chip
  */
 void Rtc_Pcf8563::setAlarm(byte min, byte hour, byte day, byte weekday)
 {
+    getDateTime();  // operate on current values
     if (min <99) {
         min = constrain(min, 0, 59);
         min = decToBcd(min);
@@ -213,53 +291,51 @@ void Rtc_Pcf8563::setAlarm(byte min, byte hour, byte day, byte weekday)
         weekday = 0x0; weekday |= RTCC_ALARM;
     }
 
-    Rtc_Pcf8563::enableAlarm();
+    alarm_hour = hour;
+    alarm_minute = min;
+    alarm_weekday = weekday;
+    alarm_day = day;
 
-    //TODO bounds check  the inputs first
+    // First set alarm values, then enable
     Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
     Wire.write((byte)RTCC_ALRM_MIN_ADDR);
-    Wire.write((byte)min);                //minute alarm value reset to 00
-    Wire.write((byte)hour);               //hour alarm value reset to 00
-    Wire.write((byte)day);                //day alarm value reset to 00
-    Wire.write((byte)weekday);            //weekday alarm value reset to 00
+    Wire.write((byte)alarm_minute);
+    Wire.write((byte)alarm_hour);
+    Wire.write((byte)alarm_day);
+    Wire.write((byte)alarm_weekday);
+    Wire.endTransmission();
+
+    Rtc_Pcf8563::enableAlarm();
+}
+
+void Rtc_Pcf8563::clearAlarm()
+{
+    //set status2 AF val to zero to reset alarm
+    status2 &= ~RTCC_ALARM_AF;
+    //set TF to 1 masks it from changing, as per data-sheet
+    status2 |= RTCC_TIMER_TF;
+    //turn off the interrupt
+    status2 &= ~RTCC_ALARM_AIE;
+
+    Wire.beginTransmission(Rtcc_Addr);
+    Wire.write((byte)RTCC_STAT2_ADDR);
+    Wire.write((byte)status2);
     Wire.endTransmission();
 }
 
 /**
-* Get alarm, set values to RTCC_NO_ALARM (99) if alarm flag is not set
+* Reset the alarm leaving interrupt unchanged
 */
-void Rtc_Pcf8563::getAlarm()
+void Rtc_Pcf8563::resetAlarm()
 {
-    /* set the start byte of the alarm data */
+    //set status2 AF val to zero to reset alarm
+    status2 &= ~RTCC_ALARM_AF;
+    //set TF to 1 masks it from changing, as per data-sheet
+    status2 |= RTCC_TIMER_TF;
     Wire.beginTransmission(Rtcc_Addr);
-    Wire.write((byte)RTCC_ALRM_MIN_ADDR);
+    Wire.write((byte)RTCC_STAT2_ADDR);
+    Wire.write((byte)status2);
     Wire.endTransmission();
-
-    Wire.requestFrom(Rtcc_Addr, 4); //request 4 bytes
-    alarm_minute = Wire.read();
-    if(B10000000 & alarm_minute){
-        alarm_minute = RTCC_NO_ALARM;
-    } else {
-        alarm_minute = bcdToDec(alarm_minute & B01111111);
-    }
-    alarm_hour = Wire.read();
-    if(B10000000 & alarm_hour){
-        alarm_hour = RTCC_NO_ALARM;
-    } else {
-        alarm_hour = bcdToDec(alarm_hour & B00111111);
-    }
-    alarm_day = Wire.read();
-    if(B10000000 & alarm_day){
-        alarm_day = RTCC_NO_ALARM;
-    } else {
-        alarm_day = bcdToDec(alarm_day  & B00111111);
-    }
-    alarm_weekday = Wire.read();
-    if(B10000000 & alarm_weekday){
-        alarm_weekday = RTCC_NO_ALARM;
-    } else {
-        alarm_weekday = bcdToDec(alarm_weekday  & B00000111);
-    }
 }
 
 /**
@@ -278,78 +354,7 @@ void Rtc_Pcf8563::clearSquareWave()
     Rtc_Pcf8563::setSquareWave(SQW_DISABLE);
 }
 
-/**
-* Reset the alarm leaving interrupt unchanged
-*/
-void Rtc_Pcf8563::resetAlarm()
-{
-    //set status2 AF val to zero to reset alarm
-    status2 &= ~RTCC_ALARM_AF;
-    Wire.beginTransmission(Rtcc_Addr);
-    Wire.write((byte)RTCC_STAT2_ADDR);
-    Wire.write((byte)status2);
-    Wire.endTransmission();
-}
-
-
-void Rtc_Pcf8563::clearAlarm()
-{
-    //set status2 AF val to zero to reset alarm
-    status2 &= ~RTCC_ALARM_AF;
-    //turn off the interrupt
-    status2 &= ~RTCC_ALARM_AIE;
-
-    Wire.beginTransmission(Rtcc_Addr);
-    Wire.write((byte)RTCC_STAT2_ADDR);
-    Wire.write((byte)status2);
-    Wire.endTransmission();
-}
-
-void Rtc_Pcf8563::getDate()
-{
-    /* set the start byte of the date data */
-    Wire.beginTransmission(Rtcc_Addr);
-    Wire.write((byte)RTCC_DAY_ADDR);
-    Wire.endTransmission();
-
-    Wire.requestFrom(Rtcc_Addr, 4); //request 4 bytes
-    //0x3f = 0b00111111
-    day = bcdToDec(Wire.read() & 0x3f);
-    //0x07 = 0b00000111
-    weekday = bcdToDec(Wire.read() & 0x07);
-    //get raw month data byte and set month and century with it.
-    month = Wire.read();
-    if (month & RTCC_CENTURY_MASK) {
-        century = 1;
-    }
-    else {
-        century = 0;
-    }
-    //0x1f = 0b00011111
-    month = month & 0x1f;
-    month = bcdToDec(month);
-}
-
-void Rtc_Pcf8563::getTime()
-{
-    /* set the start byte , get the 2 status bytes */
-    Wire.beginTransmission(Rtcc_Addr);
-    Wire.write((byte)RTCC_STAT1_ADDR);
-    Wire.endTransmission();
-
-    Wire.requestFrom(Rtcc_Addr, 5); //request 5 bytes
-    status1 = Wire.read();
-    status2 = Wire.read();
-    //0x7f = 0b01111111
-    volt_low = Wire.read();
-    sec = bcdToDec(volt_low & ~RTCC_VLSEC_MASK);
-    volt_low = volt_low & RTCC_VLSEC_MASK;  // VL_Seconds
-    minute = bcdToDec(Wire.read() & 0x7f);
-    //0x3f = 0b00111111
-    hour = bcdToDec(Wire.read() & 0x3f);
-}
-
-char *Rtc_Pcf8563::formatTime(byte style)
+const char *Rtc_Pcf8563::formatTime(byte style)
 {
     getTime();
     switch (style) {
@@ -373,12 +378,12 @@ char *Rtc_Pcf8563::formatTime(byte style)
             strOut[7] = '0' + (sec % 10);
             strOut[8] = '\0';
             break;
-        }
+    }
     return strOut;
 }
 
 
-char *Rtc_Pcf8563::formatDate(byte style)
+const char *Rtc_Pcf8563::formatDate(byte style)
 {
     getDate();
 
@@ -386,7 +391,7 @@ char *Rtc_Pcf8563::formatDate(byte style)
 
         case RTCC_DATE_ASIA:
             //do the asian style, yyyy-mm-dd
-            if ( century == 1 ){
+            if (century ){
                 strDate[0] = '1';
                 strDate[1] = '9';
             }
@@ -412,7 +417,7 @@ char *Rtc_Pcf8563::formatDate(byte style)
             strDate[3] = '0' + (day / 10);
             strDate[4] = '0' + (day % 10);
             strDate[5] = '/';
-            if ( century == 1 ){
+            if (century){
                 strDate[6] = '1';
                 strDate[7] = '9';
             }
@@ -434,7 +439,7 @@ char *Rtc_Pcf8563::formatDate(byte style)
             strDate[4] = '0' + (month % 10);
             strDate[5] = '-';
 
-            if ( century == 1 ){
+            if (century){
                 strDate[6] = '1';
                 strDate[7] = '9';
             }
@@ -451,11 +456,57 @@ char *Rtc_Pcf8563::formatDate(byte style)
     return strDate;
 }
 
+void Rtc_Pcf8563::initClock()
+{
+    Wire.beginTransmission(Rtcc_Addr);    // Issue I2C start signal
+    Wire.write((byte)0x0);        // start address
+
+    Wire.write((byte)0x0);     //control/status1
+    Wire.write((byte)0x0);     //control/status2
+    Wire.write((byte)0x81);     //set seconds & VL
+    Wire.write((byte)0x01);    //set minutes
+    Wire.write((byte)0x01);    //set hour
+    Wire.write((byte)0x01);    //set day
+    Wire.write((byte)0x01);    //set weekday
+    Wire.write((byte)0x01);     //set month, century to 1
+    Wire.write((byte)0x01);    //set year to 99
+    Wire.write((byte)0x80);    //minute alarm value reset to 00
+    Wire.write((byte)0x80);    //hour alarm value reset to 00
+    Wire.write((byte)0x80);    //day alarm value reset to 00
+    Wire.write((byte)0x80);    //weekday alarm value reset to 00
+    Wire.write((byte)0x0);     //set SQW, see: setSquareWave
+    Wire.write((byte)0x0);     //timer off
+    Wire.endTransmission();
+}
+
+void Rtc_Pcf8563::setTime(byte hour, byte minute, byte sec)
+{
+    getDateTime();
+    setDateTime(getDay(), getWeekday(), getMonth(),
+                getCentury(), getYear(), hour, minute, sec);
+}
+
+void Rtc_Pcf8563::setDate(byte day, byte weekday, byte month, bool century, byte year)
+{
+    getDateTime();
+    setDateTime(day, weekday, month, century, year,
+                getHour(), getMinute(), getSecond());
+}
+
+void Rtc_Pcf8563::getDate()
+{
+    getDateTime();
+}
+
+void Rtc_Pcf8563::getTime()
+{
+    getDateTime();
+}
+
 bool Rtc_Pcf8563::getVoltLow(void)
 {
     return volt_low;
 }
-
 
 byte Rtc_Pcf8563::getSecond() {
     return sec;
@@ -495,6 +546,10 @@ byte Rtc_Pcf8563::getMonth() {
 
 byte Rtc_Pcf8563::getYear() {
     return year;
+}
+
+bool Rtc_Pcf8563::getCentury() {
+    return century;
 }
 
 byte Rtc_Pcf8563::getWeekday() {
