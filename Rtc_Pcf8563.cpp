@@ -38,11 +38,6 @@
 #include <Arduino.h>
 #include "Rtc_Pcf8563.h"
 
-Rtc_Pcf8563::Rtc_Pcf8563(void)
-{
-    Wire.begin();
-    Rtcc_Addr = RTCC_R>>1;
-}
 
 /* Private internal functions, but useful to look at if you need a similar func. */
 byte Rtc_Pcf8563::decToBcd(byte val)
@@ -50,10 +45,18 @@ byte Rtc_Pcf8563::decToBcd(byte val)
     return ( (val/10*16) + (val%10) );
 }
 
+
 byte Rtc_Pcf8563::bcdToDec(byte val)
 {
     return ( (val/16*10) + (val%16) );
 }
+
+
+Rtc_Pcf8563::Rtc_Pcf8563(void)  // CONSTRUCTOR
+{
+    Wire.begin();
+}
+
 
 void Rtc_Pcf8563::zeroClock()
 {

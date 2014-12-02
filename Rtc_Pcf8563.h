@@ -38,10 +38,8 @@
 #ifndef Rtc_Pcf8563_H
 #define Rtc_Pcf8563_H
 
-/* the read and write values for pcf8563 rtcc */
-/* these are adjusted for arduino */
+/* IIC bus address for PCF8563 rtc */
 #define RTCC_R      0xa3
-#define RTCC_W      0xa2
 
 #define RTCC_SEC        1
 #define RTCC_MIN        2
@@ -216,7 +214,7 @@ class Rtc_Pcf8563 {
     char strOut[9];
     char strDate[11];
 
-    int Rtcc_Addr;
+    static const int Rtcc_Addr = RTCC_R >> 1;
 };
 
 #endif
