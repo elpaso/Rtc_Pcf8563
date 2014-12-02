@@ -24,12 +24,12 @@
  *               extern Wire, cevich
  *    26/11/2014 Add zeroClock(), initialize to lowest possible
  *               values, cevich
+ *    22/10/2014 add timer support, cevich
  *
  *  TODO
  *    x Add Euro date format
  *    Add short time (hh:mm) format
  *    Add 24h/12h format
- *    Add timer support
  ******
  *  Robodoc embedded documentation.
  *  http://www.xs4all.nl/~rfsber/Robo/robodoc.html
@@ -38,10 +38,8 @@
 #ifndef Rtc_Pcf8563_H
 #define Rtc_Pcf8563_H
 
-/* the read and write values for pcf8563 rtcc */
-/* these are adjusted for arduino */
+/* IIC bus address for PCF8563 rtc */
 #define RTCC_R      0xa3
-#define RTCC_W      0xa2
 
 #define RTCC_SEC        1
 #define RTCC_MIN        2
@@ -77,7 +75,24 @@
 #define RTCC_NO_ALARM       99
 
 #define RTCC_TIMER_TIE      0x01  // Timer Interrupt Enable
+
 #define RTCC_TIMER_TF       0x04  // Timer Flag, read/write active state
+                                  // When clearing, be sure to set RTCC_TIMER_AF
+                                  // to 1 (see note above).
+#define RTCC_TIMER_TI_TP    0x10  // 0: INT is active when TF is active
+                                  //    (subject to the status of TIE)
+                                  // 1: INT pulses active
+                                  //    (subject to the status of TIE);
+                                  // Note: TF stays active until cleared
+                                  // no matter what RTCC_TIMER_TI_TP is.
+#define RTCC_TIMER_TD10     0x03  // Timer source clock, TMR_1MIN saves power
+#define RTCC_TIMER_TE       0x80  // Timer 1:enable/0:disable
+
+/* Timer source-clock frequency constants */
+#define TMR_4096HZ      B00000000
+#define TMR_64Hz        B00000001
+#define TMR_1Hz         B00000010
+#define TMR_1MIN        B00000011
 
 #define RTCC_CENTURY_MASK   0x80
 #define RTCC_VLSEC_MASK     0x80
@@ -124,6 +139,13 @@ class Rtc_Pcf8563 {
     void clearAlarm(); /* clear alarm flag and interrupt */
     void resetAlarm();  /* clear alarm flag but leave interrupt unchanged */
 
+    bool timerEnabled();  // true if timer and interrupt is enabled
+    bool timerActive();   // true if timer is active (going off)
+    void enableTimer(void); // activate timer flag and interrupt
+    void setTimer(byte value, byte frequency, bool is_pulsed);  // set value & frequency
+    void clearTimer(void); // clear timer flag, and interrupt, leave value unchanged
+    void resetTimer(void); // same as clearTimer() but leave interrupt unchanged */
+
     void setSquareWave(byte frequency);
     void clearSquareWave();
 
@@ -149,6 +171,9 @@ class Rtc_Pcf8563 {
     byte getAlarmDay();
     byte getAlarmWeekday();
 
+    byte getTimerControl();
+    byte getTimerValue();
+
     // Sets date/time to static fixed values, disable all alarms
     // use zeroClock() above to guarantee lowest possible values instead.
     void initClock();
@@ -160,8 +185,8 @@ class Rtc_Pcf8563 {
 
     private:
     /* methods */
-    byte decToBcd(byte value);
-    byte bcdToDec(byte value);
+    byte decToBcd(byte value) const;
+    byte bcdToDec(byte value) const;
     /* time variables */
     byte hour;
     byte minute;
@@ -178,6 +203,9 @@ class Rtc_Pcf8563 {
     byte alarm_day;
     /* CLKOUT */
     byte squareWave;
+    /* timer */
+    byte timer_control;
+    byte timer_value;
     /* support */
     byte status1;
     byte status2;
@@ -186,7 +214,212 @@ class Rtc_Pcf8563 {
     char strOut[9];
     char strDate[11];
 
-    int Rtcc_Addr;
+    static const int Rtcc_Addr = RTCC_R >> 1;
 };
 
+
+/*
+ * PRIVATE implementations
+ */
+
+
+inline byte Rtc_Pcf8563::decToBcd(byte val) const
+{
+    return ( (val/10*16) + (val%10) );
+}
+
+
+inline byte Rtc_Pcf8563::bcdToDec(byte val) const
+{
+    return ( (val/16*10) + (val%16) );
+}
+
+
+/*
+ * PUBLIC implementations
+ */
+
+inline Rtc_Pcf8563::Rtc_Pcf8563(void)  // CONSTRUCTOR
+{
+    Wire.begin();
+}
+
+
+inline byte Rtc_Pcf8563::readStatus2()
+{
+    getDateTime();
+    return getStatus2();
+}
+
+
+inline bool Rtc_Pcf8563::alarmEnabled()
+{
+    return getStatus2() & RTCC_ALARM_AIE;
+}
+
+
+inline bool Rtc_Pcf8563::alarmActive()
+{
+    return getStatus2() & RTCC_ALARM_AF;
+}
+
+
+inline bool Rtc_Pcf8563::timerEnabled()
+{
+    if (getStatus2() & RTCC_TIMER_TIE)
+        if (timer_control & RTCC_TIMER_TE)
+            return true;
+    return false;
+}
+
+
+inline bool Rtc_Pcf8563::timerActive()
+{
+    return getStatus2() & RTCC_TIMER_TF;
+}
+
+
+inline void Rtc_Pcf8563::clearSquareWave()
+{
+    Rtc_Pcf8563::setSquareWave(SQW_DISABLE);
+}
+
+
+inline void Rtc_Pcf8563::setTime(byte hour, byte minute, byte sec)
+{
+    getDateTime();
+    setDateTime(getDay(), getWeekday(), getMonth(),
+                getCentury(), getYear(), hour, minute, sec);
+}
+
+
+inline void Rtc_Pcf8563::setDate(byte day, byte weekday, byte month,
+                                 bool century, byte year)
+{
+    getDateTime();
+    setDateTime(day, weekday, month, century, year,
+                getHour(), getMinute(), getSecond());
+}
+
+
+inline void Rtc_Pcf8563::getDate()
+{
+    getDateTime();
+}
+
+
+inline void Rtc_Pcf8563::getAlarm()
+{
+    getDateTime();
+}
+
+
+inline void Rtc_Pcf8563::getTime()
+{
+    getDateTime();
+}
+
+
+inline bool Rtc_Pcf8563::getVoltLow(void)
+{
+    return volt_low;
+}
+
+
+inline byte Rtc_Pcf8563::getSecond()
+{
+    return sec;
+}
+
+
+inline byte Rtc_Pcf8563::getMinute()
+{
+    return minute;
+}
+
+
+inline byte Rtc_Pcf8563::getHour()
+{
+    return hour;
+}
+
+
+inline byte Rtc_Pcf8563::getAlarmMinute()
+{
+    return alarm_minute;
+}
+
+
+inline byte Rtc_Pcf8563::getAlarmHour()
+{
+    return alarm_hour;
+}
+
+inline byte Rtc_Pcf8563::getAlarmDay()
+{
+    return alarm_day;
+}
+
+inline byte Rtc_Pcf8563::getAlarmWeekday()
+{
+    return alarm_weekday;
+}
+
+
+inline byte Rtc_Pcf8563::getTimerControl() {
+    return timer_control;
+}
+
+
+inline byte Rtc_Pcf8563::getTimerValue() {
+    // Impossible to freeze this value, it could be changing mid-read.
+    uint8_t last_value;
+    do {
+        last_value = timer_value;
+        getDateTime();
+    } while (timer_value != last_value);
+    return timer_value;  // Got same value twice, must be consistent
+}
+
+
+inline byte Rtc_Pcf8563::getDay()
+{
+    return day;
+}
+
+
+inline byte Rtc_Pcf8563::getMonth()
+{
+    return month;
+}
+
+
+inline byte Rtc_Pcf8563::getYear()
+{
+    return year;
+}
+
+
+inline bool Rtc_Pcf8563::getCentury()
+{
+    return century;
+}
+
+
+inline byte Rtc_Pcf8563::getWeekday()
+{
+    return weekday;
+}
+
+
+inline byte Rtc_Pcf8563::getStatus1()
+{
+    return status1;
+}
+
+
+inline byte Rtc_Pcf8563::getStatus2()
+{
+    return status2;
+}
 #endif
