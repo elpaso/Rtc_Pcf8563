@@ -132,6 +132,15 @@ class Rtc_Pcf8563 {
     /* date supports 3 styles as listed in the wikipedia page about world date/time. */
     const char *formatDate(byte style=RTCC_DATE_US);
 
+    /* Return True if century (1: 1900, 0:2000) + decade is a leap year. */
+    bool isLeapYear(byte century, int year) const;
+    /* Return number of days in any month of any decade of any year */
+    byte daysInMonth(byte century, byte year, byte month) const;
+    /* Return the number of days since the beginning of a particular year*/
+    byte daysInYear(byte century, byte year, byte month, byte day) const;
+    /* Return the weekday for any date after 1900 */
+    byte whatWeekday(byte day, byte month, byte century, int year) const;
+
     bool getVoltLow();
     byte getSecond();
     byte getMinute();
@@ -189,4 +198,60 @@ class Rtc_Pcf8563 {
     int Rtcc_Addr;
 };
 
+
+inline bool Rtc_Pcf8563::isLeapYear(byte century, int year) const
+{
+    year = 2000 - (century * 100) + year;
+    if ((year % 4) != 0)
+        return false;
+    else if ((year % 100) != 0)
+        return true;
+    else if ((year % 400) != 0)
+        return false;
+    else
+        return true;
+}
+
+
+inline byte Rtc_Pcf8563::daysInMonth(byte century,
+                                     byte year,
+                                     byte month) const
+{
+    const int days[12] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
+    byte dim = days[month];
+    if (month == 2 && isLeapYear(century, year))
+        dim += 1;
+    return dim;
+}
+
+
+inline byte Rtc_Pcf8563::daysInYear(byte century,
+                                    byte year,
+                                    byte month,
+                                    byte day) const
+{
+    const int days[11] = {90, 120, 151, 181, 212, 243, 273, 304, 334, 365};
+    if (month == 1)
+        return day;
+    else if (month == 2)
+        return 31 + day;
+    byte total = days[month - 2];
+    if (isLeapYear(century, year))
+        return 1 + total;
+    else
+        return total;
+}
+
+
+inline byte Rtc_Pcf8563::whatWeekday(byte day, byte month,
+                                     byte century, int year) const
+{
+    year = 2000 - (century * 100) + year;
+    // Credit: Tomohiko Sakamoto
+    // http://en.wikipedia.org/wiki/Determination_of_the_day_of_the_week
+    year -= month < 3;
+    static int trans[] = {0, 3, 2, 5, 0, 3, 5, 1, 4, 6, 2, 4};
+    return (year + year / 4 - year / 100 + year / 400 +
+            trans[month - 1] + day) % 7;
+}
 #endif
