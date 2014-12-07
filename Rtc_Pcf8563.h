@@ -127,11 +127,14 @@ class Rtc_Pcf8563 {
     void setSquareWave(byte frequency);
     void clearSquareWave();
 
-    /*get a output string, these call getTime/getDate for latest vals */
+    /* get a output string, these call getTime/getDate for latest vals */
     const char *formatTime(byte style=RTCC_TIME_HMS);
     /* date supports 3 styles as listed in the wikipedia page about world date/time. */
     const char *formatDate(byte style=RTCC_DATE_US);
 
+    /* Return leap-days between start (inclusive) and end (exclusive) */
+    int leapDaysBetween(byte century_start, byte year_start,
+                        byte century_end, byte year_end) const;
     /* Return True if century (1: 1900, 0:2000) + decade is a leap year. */
     bool isLeapYear(byte century, int year) const;
     /* Return number of days in any month of any decade of any year */
@@ -197,6 +200,17 @@ class Rtc_Pcf8563 {
 
     int Rtcc_Addr;
 };
+
+
+inline int Rtc_Pcf8563::leapDaysBetween(byte century_start, byte year_start,
+                                        byte century_end, byte year_end) const {
+    // Credit: Victor Haydin via stackoverflow.com
+    int span_start = 2000 - (century_start * 100) + year_start;
+    int span_end = 2000 - (century_end * 100) + year_end - 1;  // less year_end
+    // Subtract leap-years before span_start, from leap-years before span_end
+    return ((span_end / 4) - (span_end / 100) + (span_end / 400)) -
+           ((span_start / 4) - (span_start / 100) + (span_start / 400));
+}
 
 
 inline bool Rtc_Pcf8563::isLeapYear(byte century, int year) const
