@@ -230,16 +230,11 @@ inline byte Rtc_Pcf8563::daysInYear(byte century,
                                     byte month,
                                     byte day) const
 {
-    const int days[11] = {90, 120, 151, 181, 212, 243, 273, 304, 334, 365};
-    if (month == 1)
-        return day;
-    else if (month == 2)
-        return 31 + day;
-    byte total = days[month - 2];
-    if (isLeapYear(century, year))
-        return 1 + total;
-    else
-        return total;
+    const int days[12] = {0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334};
+    byte total = days[month - 1] + day;
+    if ((month > 2) and isLeapYear(century, year))
+        total += 1;
+    return total;
 }
 
 
