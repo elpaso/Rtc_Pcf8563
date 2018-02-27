@@ -35,6 +35,7 @@ HISTORY
 * 28/02/2012 A. Pasotti
    * fixed a bug in RTCC_ALARM_AF,
    * added a few (not really useful) methods
+* 24/01/2018 add getTimestamp method (return unix timestamp), gilou
 
 
 TODO
