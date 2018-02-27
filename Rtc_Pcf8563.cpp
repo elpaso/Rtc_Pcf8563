@@ -698,6 +698,7 @@ byte Rtc_Pcf8563::getStatus2() {
 }
 
 unsigned long Rtc_Pcf8563::getTimestamp(){
+	getDateTime();	// update date and time
 	unsigned long timestamp = 0;
 
 	// Convert years in days
