@@ -696,3 +696,38 @@ byte Rtc_Pcf8563::getStatus1() {
 byte Rtc_Pcf8563::getStatus2() {
     return status2;
 }
+
+unsigned long Rtc_Pcf8563::getTimestamp(){
+	unsigned long timestamp = 0;
+
+	// Convert years in days
+	timestamp = (year-epoch_year)*365; // convert years in days
+
+	if((year-epoch_year)>1)	// add a dy when it's a leap year
+	{
+		for(unsigned char i = epoch_year; i<year;i++)
+			{
+				if(isLeapYear(century, i)) timestamp++; // add a day for each leap years
+			}
+	}
+	if(month>2&&isLeapYear(century, year)) timestamp++;	// test for the year's febuary
+
+	// add months converted in days
+	if(month>1) timestamp += months_days[month-2];
+
+	// add days
+	timestamp += (day-epoch_day);
+
+	timestamp*= 86400; 		// convert days in seconds
+
+	// convert time to second and add it to timestamp
+	unsigned long timeTemp = hour*60+ minute;
+	timeTemp *=60;
+	timeTemp += sec;
+
+	timestamp += timeTemp;	// add hours +minutes + seconds
+
+	timestamp += EPOCH_TIMESTAMP;	// add  epoch reference
+
+	return timestamp;
+}
