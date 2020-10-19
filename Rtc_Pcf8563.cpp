@@ -25,11 +25,12 @@
  *    26/11/2014 Add zeroClock(), initialize to lowest possible
  *               values, cevich
  *    22/10/2014 add timer support, cevich
+ *    19/10/2020 add 12h format, add czech date format
  *
  *  TODO
  *    x Add Euro date format
  *    Add short time (hh:mm) format
- *    Add 24h/12h format
+ *    x Add 24h/12h format - done
  ******
  *  Robodoc embedded documentation.
  *  http://www.xs4all.nl/~rfsber/Robo/robodoc.html
@@ -132,7 +133,17 @@ void Rtc_Pcf8563::getDateTime(void)
     minute = bcdToDec(readBuffer[3] & 0x7f);
     //0x3f = 0b00111111
     hour = bcdToDec(readBuffer[4] & 0x3f);
-
+    if(bcdToDec(readBuffer[4] & 0x3f) > 12)
+    {
+        hour12 = bcdToDec(readBuffer[4] & 0x3f) - 12;
+        am = false;
+    }
+    else
+    {
+        hour12 = hour;
+        am = true;
+    }
+    
     // date bytes
     //0x3f = 0b00111111
     day = bcdToDec(readBuffer[5] & 0x3f);
@@ -475,6 +486,39 @@ const char *Rtc_Pcf8563::formatTime(byte style)
 {
     getTime();
     switch (style) {
+        case RTCC_TIME_HMS_12:
+            strOut[0] = '0' + (hour12 / 10);
+            strOut[1] = '0' + (hour12 % 10);
+            strOut[2] = ':';
+            strOut[3] = '0' + (minute / 10);
+            strOut[4] = '0' + (minute % 10);
+            strOut[5] = ':';
+            strOut[6] = '0' + (sec / 10);
+            strOut[7] = '0' + (sec % 10);
+            if(am == true){
+                strOut[8] = 'a';
+            }
+            else{
+                strOut[8] = 'p';
+            }
+            strOut[9] = 'm';
+            strOut[10] = '\0';
+            break;
+        case RTCC_TIME_HM_12:
+            strOut[0] = '0' + (hour12 / 10);
+            strOut[1] = '0' + (hour12 % 10);
+            strOut[2] = ':';
+            strOut[3] = '0' + (minute / 10);
+            strOut[4] = '0' + (minute % 10);
+            if(am == true){
+                strOut[5] = 'a';
+            }
+            else{
+                strOut[5] = 'p';
+            }
+            strOut[6] = 'm';
+            strOut[7] = '\0';
+            break;
         case RTCC_TIME_HM:
             strOut[0] = '0' + (hour / 10);
             strOut[1] = '0' + (hour % 10);
@@ -505,7 +549,25 @@ const char *Rtc_Pcf8563::formatDate(byte style)
     getDate();
 
         switch (style) {
-
+        case RTCC_DATE_CZ:
+            //do the czech style, dd.mm.yyyy
+            strDate[0] = '0' + (day / 10);
+            strDate[1] = '0' + (day % 10);
+            strDate[2] = '.';
+            strDate[3] = '0' + (month / 10);
+            strDate[4] = '0' + (month % 10);
+            strDate[5] = '.';
+            if (century){
+                strDate[6] = '1';
+                strDate[7] = '9';
+            } else {
+                strDate[6] = '2';
+                strDate[7] = '0';
+            }
+            strDate[8] = '0' + (year / 10 );
+            strDate[9] = '0' + (year % 10);
+            strDate[10] = '\0';
+            break;
         case RTCC_DATE_ASIA:
             //do the asian style, yyyy-mm-dd
             if (century ){
@@ -555,12 +617,10 @@ const char *Rtc_Pcf8563::formatDate(byte style)
             strDate[3] = '0' + (month / 10);
             strDate[4] = '0' + (month % 10);
             strDate[5] = '-';
-
             if (century){
                 strDate[6] = '1';
                 strDate[7] = '9';
-            }
-            else {
+            } else {
                 strDate[6] = '2';
                 strDate[7] = '0';
             }
