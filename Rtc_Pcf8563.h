@@ -25,6 +25,7 @@
  *    26/11/2014 Add zeroClock(), initialize to lowest possible
  *               values, cevich
  *    22/10/2014 add timer support, cevich
+ *    24/01/2018 add getTimestamp, gilou
  *
  *  TODO
  *    x Add Euro date format
@@ -110,12 +111,19 @@
 #define RTCC_TIME_HMS_12    0x03
 #define RTCC_TIME_HM_12     0x04
 
-/* square wave contants */
+/* square wave constants */
 #define SQW_DISABLE     B00000000
 #define SQW_32KHZ       B10000000
 #define SQW_1024HZ      B10000001
 #define SQW_32HZ        B10000010
 #define SQW_1HZ         B10000011
+
+/* epoch timestamp constants : 01/01/2016 à 00:00:00 : 1451599200 */
+#define epoch_day	1
+#define epoch_month	1
+#define epoch_year	16
+#define EPOCH_TIMESTAMP 1451606400
+const unsigned int months_days[]={31,59,90,120,151,181,212,243,273,304,334};	// days count for each month
 
 #include <Arduino.h>
 #include <Wire.h>
@@ -190,6 +198,8 @@ class Rtc_Pcf8563 {
 
     byte getTimerControl();
     byte getTimerValue();
+
+    unsigned long getTimestamp();	// return unix timestamp
 
     // Sets date/time to static fixed values, disable all alarms
     // use zeroClock() above to guarantee lowest possible values instead.
