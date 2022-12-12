@@ -133,7 +133,7 @@ extern TwoWire Wire;
 /* arduino class */
 class Rtc_Pcf8563 {
     public:
-    Rtc_Pcf8563(int sdaPin = -1, int sclPin = -1);
+    Rtc_Pcf8563();
 
     void zeroClock();  /* Zero date/time, alarm / timer, default clkout */
     void clearStatus(); /* set both status bytes to zero */
