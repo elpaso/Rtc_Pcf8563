@@ -39,9 +39,9 @@
 #include <Arduino.h>
 #include "Rtc_Pcf8563.h"
 
-Rtc_Pcf8563::Rtc_Pcf8563(void)
+Rtc_Pcf8563::Rtc_Pcf8563(int sdaPin, int sclPin)
 {
-    Wire.begin();
+    Wire.begin(sdaPin, sclPin);
     Rtcc_Addr = RTCC_R>>1;
 }
 
