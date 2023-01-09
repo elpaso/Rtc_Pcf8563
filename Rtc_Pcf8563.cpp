@@ -251,8 +251,6 @@ void Rtc_Pcf8563::enableAlarm()
     getDateTime();  // operate on current values
     //set status2 AF val to zero
     status2 &= ~RTCC_ALARM_AF;
-    //set TF to 1 masks it from changing, as per data-sheet
-    status2 |= RTCC_TIMER_TF;
     //enable the interrupt
     status2 |= RTCC_ALARM_AIE;
 
@@ -322,8 +320,6 @@ void Rtc_Pcf8563::clearAlarm()
 {
     //set status2 AF val to zero to reset alarm
     status2 &= ~RTCC_ALARM_AF;
-    //set TF to 1 masks it from changing, as per data-sheet
-    status2 |= RTCC_TIMER_TF;
     //turn off the interrupt
     status2 &= ~RTCC_ALARM_AIE;
 
@@ -340,8 +336,6 @@ void Rtc_Pcf8563::resetAlarm()
 {
     //set status2 AF val to zero to reset alarm
     status2 &= ~RTCC_ALARM_AF;
-    //set TF to 1 masks it from changing, as per data-sheet
-    status2 |= RTCC_TIMER_TF;
 
     Wire.beginTransmission(Rtcc_Addr);
     Wire.write((byte)RTCC_STAT2_ADDR);
@@ -374,8 +368,6 @@ void Rtc_Pcf8563::enableTimer(void)
     timer_control |= RTCC_TIMER_TE;
     //set status2 TF val to zero
     status2 &= ~RTCC_TIMER_TF;
-    //set AF to 1 masks it from changing, as per data-sheet
-    status2 |= RTCC_ALARM_AF;
     //enable the interrupt
     status2 |= RTCC_TIMER_TIE;
 
@@ -425,8 +417,6 @@ void Rtc_Pcf8563::clearTimer(void)
     getDateTime();
     //set status2 TF val to zero
     status2 &= ~RTCC_TIMER_TF;
-    //set AF to 1 masks it from changing, as per data-sheet
-    status2 |= RTCC_ALARM_AF;
     //turn off the interrupt
     status2 &= ~RTCC_TIMER_TIE;
     //turn off the timer
@@ -452,8 +442,6 @@ void Rtc_Pcf8563::resetTimer(void)
     getDateTime();
     //set status2 TF val to zero to reset timer
     status2 &= ~RTCC_TIMER_TF;
-    //set AF to 1 masks it from changing, as per data-sheet
-    status2 |= RTCC_ALARM_AF;
 
     Wire.beginTransmission(Rtcc_Addr);
     Wire.write((byte)RTCC_STAT2_ADDR);
